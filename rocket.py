@@ -288,7 +288,6 @@ while running:
     for shot in shots:
         enemy_shot = pygame.sprite.spritecollideany(shot, enemies)
         if enemy_shot:
-            new_exp = EnemyExplosion(enemy_shot.rect.center, explosion_images)
             enemy_shot.kill(reason=SHOT)
             shot.kill()
             player.score += 1
