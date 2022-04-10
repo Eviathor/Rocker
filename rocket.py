@@ -1,6 +1,6 @@
 import pygame
 import random
-from pygame.locals import RLEACCEL, K_UP, K_DOWN, K_LEFT, K_RIGHT, K_ESCAPE, K_SPACE, KEYDOWN, QUIT
+from pygame.locals import RLEACCEL, K_UP, K_DOWN, K_LEFT, K_RIGHT, K_ESCAPE, K_SPACE, K_p, KEYDOWN, QUIT
 import time
 
 ###
@@ -17,9 +17,16 @@ SHOT = 0
 COLLIDED = 1
 RANDOMLY_KILLED = 2
 
+# game states
+EXIT_GAME = -1
+GAMING = 0
+PAUSED = 1
+
 # colors
 BLACK = (0,0,0)
 WHITE = (255,255,255)
+SCREEN_BGC = (50,100,200)
+SCORE_COLOR = (200, 100, 125)
 
 # math constants
 EPSILON = 0.001
@@ -193,6 +200,14 @@ class Shot(pygame.sprite.Sprite):
         
         if self.rect.right > SCREEN_WIDTH:
             self.kill()
+
+
+class Window(pygame.sprite.Sprite):
+    def __init__(self, title="", dimensions=()):
+        super(Window, self).__init__()
+        if len(dimensions) > 0:
+            pass
+
     
 pygame.init()
 
@@ -242,6 +257,7 @@ enemies = pygame.sprite.Group()
 enemy_explosions = pygame.sprite.Group()
 clouds = pygame.sprite.Group()
 shots = pygame.sprite.Group()
+windows = pygame.sprite.Group()
 
 all_sprites = pygame.sprite.Group()
 all_sprites.add(player)
@@ -250,97 +266,107 @@ all_sprites.add(player)
 # This is the main game loop
 ###
 
-running = True
-while running and player.alive:
+state = GAMING
+while state >= 0:
     ###
     # poll pygame events
     ###
-    
-    for event in pygame.event.get():
-        if event.type == KEYDOWN:
-            if event.key == K_ESCAPE:
-                running = False
-    
-        elif event.type == QUIT:
-            running = False
-            
-        elif event.type == ADDENEMY:
-            if random.random() > 0.5:
-                new_enemy = Enemy(enemy_image1)
-            else:
-                new_enemy = Enemy(enemy_image2)
-                
-            enemies.add(new_enemy)
-            all_sprites.add(new_enemy)
-            
-        elif event.type == ADDCLOUD:
-            new_cloud = Cloud(cloud_image)
-            clouds.add(new_cloud)
-            all_sprites.add(new_cloud)
-            
-        elif event.type == ADDSHOT:
-            if not player.shot_blocked:
-                player.shot_blocked = True
-                shot_center = (player.rect.left, (player.rect.top + player.rect.bottom)/2)
-                new_shot = Shot(shot_center, shot_images)
-                shots.add(new_shot)
-                all_sprites.add(new_shot)
-                pygame.time.set_timer(FREESHOT, 100)
-            
-        elif event.type == FREESHOT:
-            player.shot_blocked = False
-            
-        elif event.type == ENEMYKILLED:
-            # check if killed by user
-            if event.reason >= SHOT:
-                new_exp = EnemyExplosion(event.center, explosion_images)
-                enemy_explosions.add(new_exp)
-                all_sprites.add(new_exp)
-                
-            if event.reason == SHOT:
-                player.score += 1
-            
-    
-    # poll pressed keys
-    pressed_keys = pygame.key.get_pressed()
-    
-    # update sprites location
-    rand_kill_factor = random.random()
-    all_sprites.update(pressed_keys=pressed_keys, random_factor=rand_kill_factor)
-    
-    ###
-    # update screen
-    ###
-    
-    screen.fill((50,100,200)) # background
-    for entity in all_sprites: # color in each entity
-        screen.blit(entity.surf, entity.rect)
-        
-    # score display
-    score_img = score_font.render('{0}'.format(player.score), True, (200, 100, 125))
-    screen.blit(score_img, (SCREEN_WIDTH-200, 25))
-    
-    ###
-    # most dynamic game logic is here, some is in the event handling:
-    ###
-    
-    # check if a collision happened between an enemy and the player
-    enemy_collided = pygame.sprite.spritecollideany(player, enemies)
-    if enemy_collided:
-        player.damage()
-        enemy_collided.kill(reason=COLLIDED)
+    if state == GAMING:
+        for event in pygame.event.get():
+            if event.type == KEYDOWN:
+                if event.key == K_ESCAPE:
+                    state = EXIT_GAME
+                if event.key == K_p:
+                    state = PAUSED
+
+            elif event.type == QUIT:
+                state = EXIT_GAME
+
+            elif event.type == ADDENEMY:
+                if random.random() > 0.5:
+                    new_enemy = Enemy(enemy_image1)
+                else:
+                    new_enemy = Enemy(enemy_image2)
+
+                enemies.add(new_enemy)
+                all_sprites.add(new_enemy)
+
+            elif event.type == ADDCLOUD:
+                new_cloud = Cloud(cloud_image)
+                clouds.add(new_cloud)
+                all_sprites.add(new_cloud)
+
+            elif event.type == ADDSHOT:
+                if not player.shot_blocked:
+                    player.shot_blocked = True
+                    shot_center = (player.rect.left, (player.rect.top + player.rect.bottom)/2)
+                    new_shot = Shot(shot_center, shot_images)
+                    shots.add(new_shot)
+                    all_sprites.add(new_shot)
+                    pygame.time.set_timer(FREESHOT, 100)
+
+            elif event.type == FREESHOT:
+                player.shot_blocked = False
+
+            elif event.type == ENEMYKILLED:
+                # check if killed by user
+                if event.reason >= SHOT:
+                    new_exp = EnemyExplosion(event.center, explosion_images)
+                    enemy_explosions.add(new_exp)
+                    all_sprites.add(new_exp)
+
+                if event.reason == SHOT:
+                    player.score += 1
 
 
-    # check if a collision happened between an enemy and a player shot
-    for shot in shots:
-        enemy_shot = pygame.sprite.spritecollideany(shot, enemies)
-        if enemy_shot:
-            enemy_shot.kill(reason=SHOT)
-            shot.kill()
+        # poll pressed keys
+        pressed_keys = pygame.key.get_pressed()
 
-        
-    pygame.display.flip()
+        # update sprites location
+        rand_kill_factor = random.random()
+        all_sprites.update(pressed_keys=pressed_keys, random_factor=rand_kill_factor)
+
+        ###
+        # update screen
+        ###
+
+        screen.fill(SCREEN_BGC) # background
+        for entity in all_sprites: # color in each entity
+            screen.blit(entity.surf, entity.rect)
+
+        # score display
+        score_img = score_font.render('{0}'.format(player.score), True, SCORE_COLOR)
+        screen.blit(score_img, (SCREEN_WIDTH-200, 25))
+
+        ###
+        # most dynamic game logic is here, some is in the event handling:
+        ###
+
+        # check if a collision happened between an enemy and the player
+        enemy_collided = pygame.sprite.spritecollideany(player, enemies)
+        if enemy_collided:
+            player.damage()
+            enemy_collided.kill(reason=COLLIDED)
+
+
+        # check if a collision happened between an enemy and a player shot
+        for shot in shots:
+            enemy_shot = pygame.sprite.spritecollideany(shot, enemies)
+            if enemy_shot:
+                enemy_shot.kill(reason=SHOT)
+                shot.kill()
+
+
+        pygame.display.flip()
+
+        # throttle frame rate
+    elif state == PAUSED:
+        for event in pygame.event.get():
+            if event.type == KEYDOWN:
+                if event.key == K_ESCAPE:
+                    state = EXIT_GAME
+                if event.key == K_p:
+                    state = GAMING
     
-    # throttle frame rate
     clock.tick(30)
     
