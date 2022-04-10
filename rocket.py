@@ -27,6 +27,7 @@ BLACK = (0,0,0)
 WHITE = (255,255,255)
 SCREEN_BGC = (50,100,200)
 SCORE_COLOR = (200, 100, 125)
+PAUSE_COLOR = (200, 200, 50)
 
 # math constants
 EPSILON = 0.001
@@ -189,7 +190,6 @@ class Shot(pygame.sprite.Sprite):
         self.shot_rate = 2
         
     def update(self, *args, **kwargs):
-    
         self.counter += 1
         if self.counter == self.shot_rate:
             self.counter = 0
@@ -203,12 +203,33 @@ class Shot(pygame.sprite.Sprite):
 
 
 class Window(pygame.sprite.Sprite):
-    def __init__(self, title="", dimensions=()):
+    def __init__(self, title="", dimensions=None, img=None, center=None):
         super(Window, self).__init__()
-        if len(dimensions) > 0:
-            pass
+        if not dimensions:
+            dimensions = (SCREEN_WIDTH, SCREEN_HEIGHT)
+        if not img:
+            img = pygame.Surface(size=dimensions)
+            img.fill(PAUSE_COLOR)
+        else:
+            img = pygame.transform.scale(img, dimensions)
+        if not center:
+            center = (SCREEN_WIDTH/2, SCREEN_HEIGHT/2)
 
-    
+        self.surf = img
+        self.rect = self.surf.get_rect(center=center)
+
+    def update(*args, **kwargs):
+        pass
+
+class PauseWindow(Window):
+    def __init__(self, img=None):
+        super(PauseWindow, self).__init__(title="Paused", dimensions=(400, 244), img=img)
+        self.score_font = pygame.font.SysFont('chalkduster.ttf', 72)
+
+    def kill(self):
+        super(PauseWindow, self).kill()
+        # self.texts.
+
 pygame.init()
 
 ###
@@ -248,6 +269,7 @@ enemy_image1 = pygame.image.load("assets/Missile04N.png").convert()
 enemy_image2 = pygame.image.load("assets/Missile05.png").convert()
 explosion_images = load_image_sequence("assets/exp", 16, (50,50))
 shot_images = load_image_sequence("assets/shot", 4, (30, 20))
+pause_screen = pygame.image.load("assets/pause_screen.png")
 
 # create player
 player = Player(player_image)
@@ -261,6 +283,9 @@ windows = pygame.sprite.Group()
 
 all_sprites = pygame.sprite.Group()
 all_sprites.add(player)
+
+# window hanlders
+pause_window = None
 
 ###
 # This is the main game loop
@@ -277,6 +302,9 @@ while state >= 0:
                 if event.key == K_ESCAPE:
                     state = EXIT_GAME
                 if event.key == K_p:
+                    pause_window = PauseWindow(img=pause_screen)
+                    windows.add(pause_window)
+                    all_sprites.add(pause_window)
                     state = PAUSED
 
             elif event.type == QUIT:
@@ -327,18 +355,6 @@ while state >= 0:
         all_sprites.update(pressed_keys=pressed_keys, random_factor=rand_kill_factor)
 
         ###
-        # update screen
-        ###
-
-        screen.fill(SCREEN_BGC) # background
-        for entity in all_sprites: # color in each entity
-            screen.blit(entity.surf, entity.rect)
-
-        # score display
-        score_img = score_font.render('{0}'.format(player.score), True, SCORE_COLOR)
-        screen.blit(score_img, (SCREEN_WIDTH-200, 25))
-
-        ###
         # most dynamic game logic is here, some is in the event handling:
         ###
 
@@ -356,17 +372,31 @@ while state >= 0:
                 enemy_shot.kill(reason=SHOT)
                 shot.kill()
 
-
-        pygame.display.flip()
-
-        # throttle frame rate
     elif state == PAUSED:
         for event in pygame.event.get():
             if event.type == KEYDOWN:
                 if event.key == K_ESCAPE:
                     state = EXIT_GAME
                 if event.key == K_p:
+                    pause_window.kill()
                     state = GAMING
+
     
+    ###
+    # update screen
+    ###
+
+    # background
+    screen.fill(SCREEN_BGC) 
+    # color in each entity
+    for entity in all_sprites: 
+        screen.blit(entity.surf, entity.rect)
+    
+    # score display
+    score_img = score_font.render('{0}'.format(player.score), True, SCORE_COLOR)
+    screen.blit(score_img, (SCREEN_WIDTH-200, 25))
+    pygame.display.flip()
+
+    # throttle frame rate
     clock.tick(30)
     
