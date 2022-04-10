@@ -43,6 +43,7 @@ class Player(pygame.sprite.Sprite):
         self.rect = self.surf.get_rect()
         self.shot_blocked = False
         self.score = 0
+        self.alive = True
         
     def update_movement(self, pressed_keys):
         if pressed_keys[K_UP]:
@@ -79,7 +80,7 @@ class Player(pygame.sprite.Sprite):
         
     def damage(self):
         self.score -= 1
-        return self.score >= 0
+        self.alive = self.score >= 0
         
         
 class Enemy(pygame.sprite.Sprite):
@@ -250,7 +251,7 @@ all_sprites.add(player)
 ###
 
 running = True
-while running:
+while running and player.alive:
     ###
     # poll pygame events
     ###
@@ -326,7 +327,7 @@ while running:
     # check if a collision happened between an enemy and the player
     enemy_collided = pygame.sprite.spritecollideany(player, enemies)
     if enemy_collided:
-        running = player.damage() # when damage returns False, the game is over
+        player.damage()
         enemy_collided.kill(reason=COLLIDED)
 
 
