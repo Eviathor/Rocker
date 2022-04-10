@@ -1,13 +1,28 @@
 import pygame
 import random
 from pygame.locals import RLEACCEL, K_UP, K_DOWN, K_LEFT, K_RIGHT, K_ESCAPE, K_SPACE, KEYDOWN, QUIT
+import time
 
+###
 # constants
+###
+
+# screen dimension
 SCREEN_WIDTH = 800
 SCREEN_HEIGHT = 600
+
+# death reasons
+OUT_OF_SCREEN = -1
 SHOT = 0
 COLLIDED = 1
-OUT_OF_SCREEN = -1
+RANDOMLY_KILLED = 2
+
+# colors
+BLACK = (0,0,0)
+WHITE = (255,255,255)
+
+# math constants
+EPSILON = 0.001
 
 def load_image_sequence(path, num, dims = None, ext='png'):
     seq = []
@@ -24,7 +39,7 @@ class Player(pygame.sprite.Sprite):
         super(Player, self).__init__()
         
         self.surf = img
-        self.surf.set_colorkey((0,0,0), RLEACCEL)
+        self.surf.set_colorkey(BLACK, RLEACCEL)
         self.rect = self.surf.get_rect()
         self.shot_blocked = False
         self.score = 0
@@ -53,9 +68,11 @@ class Player(pygame.sprite.Sprite):
         if pressed_keys[K_SPACE]:
             self.shoot()
         
-    def update(self, pressed_keys):
-        self.update_movement(pressed_keys)
-        self.update_actions(pressed_keys)
+    def update(self, *args, **kwargs):
+        pressed_keys = kwargs.get('pressed_keys')
+        if pressed_keys:
+            self.update_movement(pressed_keys)
+            self.update_actions(pressed_keys)
         
     def shoot(self):
         pygame.event.post(pygame.event.Event(ADDSHOT))
@@ -72,7 +89,7 @@ class Enemy(pygame.sprite.Sprite):
         
         self.surf = img
         self.surf = pygame.transform.scale(self.surf, (75, 50))
-        self.surf.set_colorkey((0,0,0), RLEACCEL)
+        self.surf.set_colorkey(BLACK, RLEACCEL)
         
         self.rect = self.surf.get_rect(
             center=(
@@ -82,10 +99,14 @@ class Enemy(pygame.sprite.Sprite):
         )
         self.speed = random.randint(5,20)
         
-    def update(self, *args):
+    def update(self, *args, **kwargs):
         self.rect.move_ip(-self.speed, 0)
         if self.rect.right < 0:
-            self.kill()
+            self.kill(reason=OUT_OF_SCREEN)
+            
+        kill_factor = kwargs.get('random_factor')
+        if kill_factor and abs(kill_factor - random.random()) < EPSILON:
+            self.kill(reason=RANDOMLY_KILLED)
             
     def kill(self, reason=OUT_OF_SCREEN):
         super(Enemy, self).kill()
@@ -106,12 +127,13 @@ class EnemyExplosion(pygame.sprite.Sprite):
         self.counter = 0
         self.current = 0
         self.surf = self.explosion_sequence[self.current]
-        self.surf.set_colorkey((0,0,0), RLEACCEL)
+        self.surf.set_colorkey(BLACK, RLEACCEL)
         self.rect = self.surf.get_rect(center=center)
         self.exp_rate = 2
-        self.speed = 2
+        self.speed_x = 3
+        self.speed_y = 3
         
-    def update(self, *args):
+    def update(self, *args, **kwargs):
         if self.current >= len(self.explosion_sequence):
             self.kill()
             return
@@ -120,17 +142,17 @@ class EnemyExplosion(pygame.sprite.Sprite):
         if self.counter == self.exp_rate and self.current < len(self.explosion_sequence):
             self.counter = 0
             self.surf = self.explosion_sequence[self.current]
-            self.surf.set_colorkey((0,0,0), RLEACCEL)
+            self.surf.set_colorkey(BLACK, RLEACCEL)
             self.current += 1
             
-        self.rect.move_ip(-self.speed, -1)
+        self.rect.move_ip(-self.speed_x, -self.speed_y)
             
         
 class Cloud(pygame.sprite.Sprite):
     def __init__(self, img):
         super(Cloud,self).__init__()
         self.surf = img
-        self.surf.set_colorkey((0,0,0), RLEACCEL)
+        self.surf.set_colorkey(BLACK, RLEACCEL)
         self.speed = 5
         
         self.rect = self.surf.get_rect(
@@ -140,7 +162,7 @@ class Cloud(pygame.sprite.Sprite):
             )
         )
         
-    def update(self, *args):
+    def update(self, *args, **kwargs):
         self.rect.move_ip(-self.speed, 0)
         if self.rect.right < 0:
             self.kill()
@@ -151,20 +173,20 @@ class Shot(pygame.sprite.Sprite):
         super(Shot, self).__init__()
         self.shot_sequence = img
         self.surf = self.shot_sequence[0]
-        self.surf.set_colorkey((0,0,0), RLEACCEL)
+        self.surf.set_colorkey(BLACK, RLEACCEL)
         self.rect = self.surf.get_rect(center=center)
         self.counter = 0
         self.current = 0
         self.speed = 15
         self.shot_rate = 2
         
-    def update(self, *args):
+    def update(self, *args, **kwargs):
     
         self.counter += 1
         if self.counter == self.shot_rate:
             self.counter = 0
             self.surf = self.shot_sequence[self.current]
-            self.surf.set_colorkey((0,0,0), RLEACCEL)
+            self.surf.set_colorkey(BLACK, RLEACCEL)
             self.current = (self.current + 1) % len(self.shot_sequence)
         self.rect.move_ip(15, 0)
         
@@ -173,8 +195,9 @@ class Shot(pygame.sprite.Sprite):
     
 pygame.init()
 
-# score font
-score_font = pygame.font.SysFont('chalkduster.ttf', 72)
+###
+# Events
+###
 
 # define events
 ADDENEMY = pygame.USEREVENT + 1
@@ -190,10 +213,19 @@ pygame.time.set_timer(ADDENEMY, 250)
 # set world time
 clock = pygame.time.Clock()
 
+###
 # init screen
+###
+
 screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
 
-# initialize assets
+# score font
+score_font = pygame.font.SysFont('chalkduster.ttf', 72)
+
+###
+# initialize assets and sprites
+###
+
 cloud_image = pygame.image.load("assets/grey_cloud1.png").convert()
 player_image = pygame.image.load("assets/jetfighter.png").convert()
 enemy_image1 = pygame.image.load("assets/Missile04N.png").convert()
@@ -219,7 +251,10 @@ all_sprites.add(player)
 
 running = True
 while running:
+    ###
     # poll pygame events
+    ###
+    
     for event in pygame.event.get():
         if event.type == KEYDOWN:
             if event.key == K_ESCAPE:
@@ -260,18 +295,29 @@ while running:
                 new_exp = EnemyExplosion(event.center, explosion_images)
                 enemy_explosions.add(new_exp)
                 all_sprites.add(new_exp)
+                
+            if event.reason == SHOT:
+                player.score += 1
             
     
     # poll pressed keys
     pressed_keys = pygame.key.get_pressed()
     
     # update sprites location
-    all_sprites.update(pressed_keys)
+    rand_kill_factor = random.random()
+    all_sprites.update(pressed_keys=pressed_keys, random_factor=rand_kill_factor)
     
+    ###
     # update screen
+    ###
+    
     screen.fill((50,100,200)) # background
     for entity in all_sprites: # color in each entity
         screen.blit(entity.surf, entity.rect)
+        
+    # score display
+    score_img = score_font.render('{0}'.format(player.score), True, (200, 100, 125))
+    screen.blit(score_img, (SCREEN_WIDTH-200, 25))
     
     ###
     # most dynamic game logic is here, some is in the event handling:
@@ -290,13 +336,10 @@ while running:
         if enemy_shot:
             enemy_shot.kill(reason=SHOT)
             shot.kill()
-            player.score += 1
-    
-    # score display
-    score_img = score_font.render('{0}'.format(player.score), True, (200, 100, 125))
-    screen.blit(score_img, (SCREEN_WIDTH-200, 25))
+
         
     pygame.display.flip()
     
     # throttle frame rate
     clock.tick(30)
+    
