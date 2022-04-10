@@ -219,7 +219,10 @@ all_sprites.add(player)
 
 running = True
 while running:
+    ###
     # poll pygame events
+    ###
+    
     for event in pygame.event.get():
         if event.type == KEYDOWN:
             if event.key == K_ESCAPE:
@@ -268,10 +271,17 @@ while running:
     # update sprites location
     all_sprites.update(pressed_keys)
     
+    ###
     # update screen
+    ###
+    
     screen.fill((50,100,200)) # background
     for entity in all_sprites: # color in each entity
         screen.blit(entity.surf, entity.rect)
+        
+    # score display
+    score_img = score_font.render('{0}'.format(player.score), True, (200, 100, 125))
+    screen.blit(score_img, (SCREEN_WIDTH-200, 25))
     
     ###
     # most dynamic game logic is here, some is in the event handling:
@@ -291,12 +301,10 @@ while running:
             enemy_shot.kill(reason=SHOT)
             shot.kill()
             player.score += 1
-    
-    # score display
-    score_img = score_font.render('{0}'.format(player.score), True, (200, 100, 125))
-    screen.blit(score_img, (SCREEN_WIDTH-200, 25))
+
         
     pygame.display.flip()
     
     # throttle frame rate
     clock.tick(30)
+    
